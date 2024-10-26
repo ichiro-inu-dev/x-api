@@ -4,15 +4,14 @@ import datetime
 from typing import List, Dict
 from dotenv import load_dotenv
 import tweepy
+import json
 
 load_dotenv()  # Load environment variables from .env file
 
 class TwitterFeed:
     def __init__(self, twitter_accounts: List[str]):
         self.bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
-        print(f"bearer_token: {self.bearer_token}")
         self.twitter_accounts = twitter_accounts
-        print(f"twitter_accounts: {self.twitter_accounts}")
         self.client = None
 
     async def initialize_client(self):
@@ -26,20 +25,25 @@ class TwitterFeed:
         except Exception as e:
             print(f"Failed to refresh token: {e}")
 
-    async def fetch_tweets(self, username: str, tweet_count: int = 10) -> List[Dict]:
+    async def fetch_tweets(self, twitter_account: object, tweet_count: int = 10) -> List[Dict]:
         """Fetch the last `tweet_count` tweets for a given username."""
         try:
-            user = self.client.get_user(username=username)
-            if user.data is None:
-                print(f"User {username} not found.")
-                return []
-            
-            tweets = self.client.get_users_tweets(user_id=user.data.id, max_results=tweet_count)
+            print(f"fetch_tweets for {twitter_account['username']} id:{twitter_account['id']}")
+            # print(f"Get username: {username}")
+            # user = self.client.get_user(username=username)
+            # if user.data is None:
+            #     print(f"User {username} not found.")
+            #     return []
+            # else:
+            #     print(user.data)
+            #     return []
+
+            tweets = self.client.get_users_tweets(id=twitter_account['id'], max_results=tweet_count)
             return [{"id": tweet.id, "text": tweet.text} for tweet in tweets.data] if tweets.data else []
         except tweepy.TweepyException as e:
-            print(f"Error fetching tweets for {username}: {e}")
+            print(f"Error fetching tweets for {twitter_account['username']}: {e}")
         except Exception as e:
-            print(f"An unexpected error occurred while fetching tweets for {username}: {e}")
+            print(f"An unexpected error occurred while fetching tweets for {twitter_account['username']}: {e}")
         return []
 
     async def periodic_fetch(self, interval: int = 300):
@@ -55,6 +59,20 @@ class TwitterFeed:
         await self.initialize_client()
         await self.periodic_fetch()
 
+def load_userids_from_file(datafile):
+    """Load userid from JSON file"""
+    try:
+        # Reading the data back
+        with open(datafile, 'r') as config_file:
+            data_loaded = json.load(config_file)
+
+        print("Data loaded from file:")
+        print(data_loaded)
+        return data_loaded
+    
+    except Exception as e:
+        print(f"Failed to load data from file: {datafile} {e}")
+        return {}
 # Global error handling
 def handle_global_error(loop, context):
     print(f"Global error occurred: {context['message']}")
@@ -62,15 +80,15 @@ def handle_global_error(loop, context):
 # Example usage
 if __name__ == "__main__":
     # List of Twitter accounts to monitor
-    TWITTER_ACCOUNTS = [
-        'OpenAI',
-        'DeepMind',
-        'sama',
-        'bitcoin'
-        ]
+    # TWITTER_ACCOUNTS = [
+    #     'OpenAI',
+    #     'DeepMind',
+    #     'sama',
+    #     'bitcoin'
+    #     ]
+    TWITTER_ACCOUNTS = load_userids_from_file('x-user-ids.json')
 
-    twitter_feed = TwitterFeed(twitter_accounts=TWITTER_ACCOUNTS)
-
+    twitter_feed = TwitterFeed(twitter_accounts=TWITTER_ACCOUNTS)    
     loop = asyncio.get_event_loop()
     loop.set_exception_handler(handle_global_error)
     try:
